@@ -60,19 +60,29 @@ const LAYOUTS: Record<LayoutTemplate, LayoutSpec> = {
     textX: 256, textY: 480,
     textSize: 0,
   },
+  "brandcrowd-modern": {
+    template: "brandcrowd-modern",
+    width: 512, height: 512,
+    iconX: 136, iconY: 28,
+    iconSize: 240,
+    textX: 256, textY: 340,
+    textSize: 44,
+    taglineY: 388,
+    taglineSize: 18,
+  },
 };
 
 // ─── Style → preferred layouts ───────────────────────────────
 const STYLE_LAYOUT_PREFERENCES: Record<LogoStyle, LayoutTemplate[]> = {
   mascot:     ["stacked", "icon-above", "icon-left"],
-  minimalist: ["icon-above", "icon-left", "stacked"],
-  wordmark:   ["icon-left", "icon-above", "stacked"],
+  minimalist: ["brandcrowd-modern", "icon-above", "stacked", "icon-left"],
+  wordmark:   ["icon-left", "brandcrowd-modern", "stacked"],
   lettermark: ["lettermark-only", "emblem-ring", "icon-only"],
-  emblem:     ["emblem-ring", "icon-above"],
-  abstract:   ["icon-above", "stacked"],
+  emblem:     ["emblem-ring", "brandcrowd-modern"],
+  abstract:   ["brandcrowd-modern", "icon-above", "stacked"],
   vintage:    ["emblem-ring", "icon-above"],
-  geometric:  ["icon-above", "stacked"],
-  "3d":       ["stacked", "icon-above"],
+  geometric:  ["brandcrowd-modern", "icon-above", "stacked"],
+  "3d":       ["brandcrowd-modern", "stacked", "icon-above"],
   handdrawn:  ["stacked", "icon-above", "icon-left"],
 };
 

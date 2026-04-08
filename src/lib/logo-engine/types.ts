@@ -11,7 +11,8 @@ export type LayoutTemplate =
   | "stacked"      // text over icon background
   | "emblem-ring"  // circular emblem with icon center
   | "lettermark-only" // just the initials
-  | "icon-only";   // just the icon, no text
+  | "icon-only"    // just the icon, no text
+  | "brandcrowd-modern"; // Large centered complex icon, with elegant split-text and completely uppercase spaced tagline
 
 export interface LogoInput {
   businessName: string;

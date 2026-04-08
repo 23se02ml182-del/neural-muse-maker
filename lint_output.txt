@@ -1,0 +1,10 @@
+
+> vite_react_shadcn_ts@0.0.0 lint
+> eslint .
+
+
+C:\Users\Prince\Downloads\new ai\neural-muse-maker-main\src\pages\CreateLogo.tsx
+  212:6  warning  React Hook useCallback has a missing dependency: 'primaryIndustry'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+Γ£û 1 problem (0 errors, 1 warning)
+

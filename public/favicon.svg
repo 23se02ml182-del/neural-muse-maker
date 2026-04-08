@@ -1,0 +1,87 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="80" x2="416" y2="432" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B4D8C"/>
+      <stop offset="0.55" stop-color="#0D5FA5"/>
+      <stop offset="1" stop-color="#081D4B"/>
+    </linearGradient>
+    <linearGradient id="accentRed" x1="176" y1="180" x2="368" y2="282" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4F4F"/>
+      <stop offset="1" stop-color="#FF7A2F"/>
+    </linearGradient>
+    <linearGradient id="accentCyan" x1="172" y1="200" x2="356" y2="336" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3EE3FF"/>
+      <stop offset="1" stop-color="#65C9FF"/>
+    </linearGradient>
+    <linearGradient id="monogram" x1="196" y1="178" x2="320" y2="358" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF2FF"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
+  <rect x="28" y="28" width="456" height="456" rx="96" stroke="white" stroke-opacity="0.06" stroke-width="4"/>
+
+  <path
+    d="M184 328V184C184 164.118 200.118 148 220 148H264C290.51 148 312 169.49 312 196V228H336C362.51 228 384 249.49 384 276V328C384 354.51 362.51 376 336 376H220C200.118 376 184 359.882 184 340V328Z"
+    fill="url(#accentCyan)"
+    opacity="0.28"
+  />
+
+  <path
+    d="M182 324V184C182 165.222 197.222 150 216 150H264C289.33 150 310 170.67 310 196V229H340C364.299 229 384 248.701 384 273V324C384 350.51 362.51 372 336 372H218C197.565 372 182 356.435 182 336V324Z"
+    fill="url(#monogram)"
+  />
+
+  <path
+    d="M182 318V184C182 165.222 197.222 150 216 150H264C289.33 150 310 170.67 310 196V229H340C364.299 229 384 248.701 384 273V318"
+    stroke="#0E2E74"
+    stroke-opacity="0.14"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <path
+    d="M190 246C230 194 296 182 350 216"
+    stroke="url(#accentRed)"
+    stroke-width="18"
+    stroke-linecap="round"
+  />
+  <path
+    d="M182 258C232 208 306 206 368 248"
+    stroke="url(#accentCyan)"
+    stroke-width="12"
+    stroke-linecap="round"
+  />
+
+  <path
+    d="M230 186H268V322H230"
+    stroke="#083A6E"
+    stroke-width="34"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M236 190H262V316H236"
+    stroke="#FFFFFF"
+    stroke-width="24"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <path
+    d="M278 228C292 228 304 240 304 254V300"
+    stroke="#083A6E"
+    stroke-width="24"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M278 230C291 230 302 241 302 254V300"
+    stroke="#FFFFFF"
+    stroke-width="14"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

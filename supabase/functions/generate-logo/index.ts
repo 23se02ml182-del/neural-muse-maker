@@ -407,6 +407,29 @@ function isDairyBrandRequest(req: LogoRequest): boolean {
   return /\b(milk|dairy|cow milk|fresh milk|butter|cheese|cream|yogurt)\b/i.test(text);
 }
 
+function buildBrandIdentityDirective(req: LogoRequest): string {
+  const name = req.businessName.trim();
+  const industry = req.industry.trim();
+  const description = req.brandDescription?.trim();
+  const iconIdea = req.iconIdea?.trim();
+
+  const parts = [
+    `Design for the brand "${name}" in the ${industry} category.`,
+    "Create one ownable symbol with a distinctive silhouette that feels premium, memorable, and easy to recognize at favicon size.",
+    "Avoid generic stock-style marks, thin placeholder icons, and noisy decorative details.",
+  ];
+
+  if (description) {
+    parts.push(`Brand essence to express: ${description}.`);
+  }
+
+  if (iconIdea) {
+    parts.push(`The chosen icon idea is: ${iconIdea}.`);
+  }
+
+  return parts.join(" ");
+}
+
 function buildBrandFocusDirective(req: LogoRequest): string {
   if (isDairyBrandRequest(req)) {
     return "This is a dairy brand. Prioritize a premium cow mascot, milk seal, or heritage dairy crest with a larger central icon, warm premium anatomy, and strong brand recall. Avoid tiny abstract marks and do not render readable text inside the artwork.";
@@ -414,7 +437,7 @@ function buildBrandFocusDirective(req: LogoRequest): string {
   if ((req.industry || "").toLowerCase().includes("food")) {
     return "This is a food and beverage brand. Favor a generous, friendly, premium symbol with clear silhouette, appetizing warmth, and strong small-size readability.";
   }
-  return "";
+  return "Keep the icon language consistent with a high-end brand system: clean silhouette, premium spacing, distinctive structure, and strong recognition at both app icon and storefront sizes.";
 }
 
 // ─── PROMPT ENGINE (100x better prompts) ─────────────────────────────────────
@@ -434,16 +457,23 @@ function buildLogoPrompt(req: LogoRequest): string {
   const base = stylePrompts[req.style] ?? buildMinimalistPrompt(req);
   const styleHint = req.styleHint?.trim() ? ` Use this preferred style direction: ${req.styleHint}.` : "";
   const variation = buildVariationDirective(req);
+  const brandIdentity = buildBrandIdentityDirective(req);
   const brandFocus = buildBrandFocusDirective(req);
   const iconOnlyRule =
     "Return icon-only artwork. Do not render the brand name, tagline, readable words, letters, numbers, captions, or UI chrome inside the image. The backend will add all text later.";
   const canvasRule =
     "The icon must feel bold, centered, and full-bodied, occupying most of the canvas without tiny margins or empty whitespace.";
+  const lockupRule =
+    "Design the icon like a premium brand mark that can be placed inside a polished logo lockup. Keep it balanced, simple, memorable, and suitable for a luxury identity system.";
   const premiumRule =
-    "Think luxury brand asset, not a sticker: high-fashion restraint, strong silhouette, premium negative space, and a mark that can hold up on a boutique storefront, product box, or app splash screen.";
+    "Think luxury brand asset, not a sticker: high-fashion restraint, strong silhouette, premium negative space, and a mark that can hold up on a boutique storefront, product box, or app splash screen. Avoid cartoons, mockups, badges, poster layouts, and busy illustrative scenes.";
   const luxuryRule =
-    "Primary aesthetic: black, ivory, and champagne-gold luxury branding, editorial polish, expensive typography, and a high-end boutique feel.";
-  return `${base} ${iconOnlyRule} ${canvasRule} ${premiumRule} ${luxuryRule}${brandFocus ? ` ${brandFocus}` : ""}${styleHint}${variation}`.trim();
+    "Primary aesthetic: black, ivory, and champagne-gold luxury branding, editorial polish, expensive typography, and a high-end boutique feel. Prefer clean vector clarity, crisp edges, and a single confident focal mark.";
+  const familyRule =
+    "If multiple variations are requested, keep them in the same premium family. Change silhouette, proportions, or motif, but do not switch to a completely different identity direction.";
+  const applicationRule =
+    "The result should work as a logo mark on packaging, social avatar, app icon, and signage.";
+  return `${base} ${brandIdentity} ${iconOnlyRule} ${canvasRule} ${lockupRule} ${premiumRule} ${luxuryRule} ${familyRule} ${applicationRule}${brandFocus ? ` ${brandFocus}` : ""}${styleHint}${variation}`.trim();
 }
 
 function buildPollinationsPrompt(req: LogoRequest): string {
@@ -713,9 +743,9 @@ function buildVariationDirective(req: LogoRequest): string {
         "Use a mascot emblem with strong outline, cheerful expression, and space for a brand title below.",
       ];
   const idx = Math.max(0, req.variationIndex ?? 0);
-    const flavor = variationFlavors[idx % variationFlavors.length];
+  const flavor = variationFlavors[idx % variationFlavors.length];
   const seedHint = typeof req.variationSeed === "number" ? ` Seed: ${req.variationSeed}.` : "";
-  return ` Variation number: ${idx + 1}. ${flavor}. Do not repeat the same silhouette or icon geometry from earlier variations in this batch.${seedHint}`;
+  return `Variation number: ${idx + 1}. ${flavor}. Keep this variation in the same premium identity system as the others, but change the silhouette, icon geometry, or composition enough that each option feels distinct. Do not repeat the exact same silhouette from earlier variations in this batch.${seedHint}`;
 }
 
 function colorBlock(colors?: string[]): string {
@@ -2275,8 +2305,9 @@ serve(async (req) => {
           providerAttempt.run,
           providerAttempt.maxAttempts,
         );
-        // Compose provider mascot icon into a premium, readable brand layout.
-        imageUrl = generated.dataUri;
+        // Wrap the provider artwork in the app's premium logo system so the
+        // final result stays consistent, polished, and brand-readable.
+        imageUrl = composeLogoFromIcon(generated.dataUri, body, seed);
         provider = providerAttempt.name;
         sourceImageUrl = generated.sourceUrl;
       } catch (e) {
@@ -2311,7 +2342,7 @@ serve(async (req) => {
           buildVersion: BUILD_VERSION,
           providerMode: LOGO_PROVIDER_MODE,
           providerOverride: undefined,
-          composeMode: "provider-direct",
+          composeMode: "provider-composed",
           promptEnhancer: enhancedPrompt.enhancer || undefined,
           warning,
           providerErrors: providerErrors.length ? providerErrors : undefined,

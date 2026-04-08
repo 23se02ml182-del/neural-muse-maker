@@ -4,18 +4,22 @@ function isErrorWithMessage(e: unknown): e is { message: string } {
   return typeof e === "object" && e !== null && "message" in e;
 }
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Loader2, Download, Sparkles, Save, Heart, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Download, Sparkles, Save, Heart, Check, Cpu, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/Header";
 import LogoAdvisorChat from "@/components/LogoAdvisorChat";
-import { generateLogo, type LogoStyle } from "@/lib/logo-client";
+import { generateVariations } from "@/lib/logo-engine";
+import type { LogoStyle, GeneratedLogo as EngineGeneratedLogo } from "@/lib/logo-engine/types";
 import { logoStyles, colorPalettes, industries, iconIdeas } from "@/lib/logo-options";
+import { LogoSVGRenderer } from "@/components/LogoSVGRenderer";
+import { exportToPNG } from "@/lib/logo-engine";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogoPreferences } from "@/hooks/useLogoPreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { generateHFLogo, isHFConfigured } from "@/lib/hf-image-generator";
 const LOGOS_PER_STYLE = 3;
 const MAX_STYLE_SELECTION = 4;
 
@@ -25,6 +29,7 @@ type GeneratedLogo = {
   styleLabel: string;
   variationIndex: number;
   globalIndex: number;
+  engineLogo?: EngineGeneratedLogo;
 };
 
 const getStyleLabel = (styleId: string) =>
@@ -74,6 +79,8 @@ const CreateLogo = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [autoTriggered, setAutoTriggered] = useState(false);
+  const [generationMode, setGenerationMode] = useState<"svg" | "ai">("svg");
+  const [aiProgress, setAiProgress] = useState("");
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: searchParams.get("name") || "",
@@ -137,6 +144,7 @@ const CreateLogo = () => {
 
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
+    setAiProgress("");
     try {
       const styles = selectedStyles.length > 0 ? selectedStyles : (formData.style ? [formData.style] : ["emblem"]);
       const allLogos: GeneratedLogo[] = [];
@@ -157,48 +165,74 @@ const CreateLogo = () => {
         const source = filtered.length >= 3 ? filtered : words;
         return source.slice(0, 6).join(" ");
       })();
-      for (const styleId of styles) {
-        const styleLabel = getStyleLabel(styleId);
-        const engineStyle = mapUiStyleToEngineStyle(styleId);
-        const brandNotes = [
-          `Create a premium ${styleLabel.toLowerCase()} logo.`,
-          "Use a polished, marketplace-quality look.",
-          "Avoid generic circle, cube, or four-square placeholder marks.",
-          "Prefer strong emblem, badge, crest, or premium brand-symbol compositions.",
-          formData.iconIdea ? `Icon idea: ${formData.iconIdea}.` : "",
-          normalizedDescription ? `Brand description: ${normalizedDescription}.` : "",
-        ].filter(Boolean).join(" ");
 
-        for (let variationIndex = 0; variationIndex < LOGOS_PER_STYLE; variationIndex++) {
-          const result = await generateLogo({
+      // ─── AI MODE (Hugging Face) ────────────────────────────
+      if (generationMode === "ai") {
+        const totalAiLogos = styles.length * LOGOS_PER_STYLE;
+        let aiCount = 0;
+        for (const styleId of styles) {
+          const styleLabel = getStyleLabel(styleId);
+          for (let v = 0; v < LOGOS_PER_STYLE; v++) {
+            aiCount++;
+            setAiProgress(`Generating AI logo ${aiCount}/${totalAiLogos} (${styleLabel})…`);
+            try {
+              const result = await generateHFLogo({
+                businessName: formData.name,
+                industry: primaryIndustry,
+                style: styleId,
+                tagline,
+                colors: paletteColors,
+                mood: formData.description || undefined,
+                iconIdea: formData.iconIdea || undefined,
+                description: normalizedDescription || undefined,
+              }, (msg) => setAiProgress(`[${aiCount}/${totalAiLogos}] ${msg}`));
+              allLogos.push({
+                imageUrl: result.imageUrl,
+                styleId,
+                styleLabel,
+                variationIndex: v,
+                globalIndex: allLogos.length,
+              });
+            } catch (err) {
+              console.warn(`AI logo ${aiCount} failed:`, err);
+              if (allLogos.length === 0 && aiCount === 1) throw err;
+            }
+          }
+        }
+      } else {
+        // ─── SVG ENGINE MODE ───────────────────────────────────
+        for (const styleId of styles) {
+          const styleLabel = getStyleLabel(styleId);
+          const engineStyle = mapUiStyleToEngineStyle(styleId);
+          const brandNotes = [
+            `Create a premium ${styleLabel.toLowerCase()} logo.`,
+            "Use a polished, marketplace-quality look.",
+            "Avoid generic circle, cube, or four-square placeholder marks.",
+            "Prefer strong emblem, badge, crest, or premium brand-symbol compositions.",
+            formData.iconIdea ? `Icon idea: ${formData.iconIdea}.` : "",
+            normalizedDescription ? `Brand description: ${normalizedDescription}.` : "",
+          ].filter(Boolean).join(" ");
+
+          const styleVariations = await generateVariations({
             businessName: formData.name,
             tagline,
-            brandDescription: normalizedDescription || undefined,
+            description: normalizedDescription || undefined,
             industry: primaryIndustry,
             style: engineStyle,
             colors: paletteColors,
             iconIdea: formData.iconIdea || undefined,
-            styleHint: styleLabel,
-            additionalInstructions: brandNotes,
-            variationIndex,
-            variationSeed: buildVariationSeed(
-              formData.name,
-              styleId,
-              variationIndex,
-              normalizedDescription,
-              primaryIndustry,
-              formData.iconIdea,
-              formData.colorPalette,
-            ),
-          });
+          }, LOGOS_PER_STYLE);
 
-          const globalIndex = allLogos.length;
-          allLogos.push({
-            imageUrl: result.imageUrl,
-            styleId,
-            styleLabel,
-            variationIndex,
-            globalIndex,
+          styleVariations.forEach((result, variationIndex) => {
+            const globalIndex = allLogos.length;
+            allLogos.push({
+              imageUrl: result.dataUrl,
+              styleId,
+              styleLabel,
+              variationIndex,
+              globalIndex,
+              engineLogo: result,
+            });
           });
         }
       }
@@ -217,22 +251,11 @@ const CreateLogo = () => {
       else toast.error("Failed to generate logo");
     } finally {
       setIsGenerating(false);
+      setAiProgress("");
     }
-  }, [formData, selectedStyles, primaryIndustry]);
+  }, [formData, selectedStyles, primaryIndustry, generationMode]);
 
   const handleGenerateClick = () => {
-    if (!user) {
-      try {
-        sessionStorage.setItem(
-          "pendingLogo",
-          JSON.stringify({ formData, step })
-        );
-      } catch (err) {
-        console.warn("failed to save pending logo state", err);
-      }
-      navigate(`/auth?redirect=${encodeURIComponent("/create?generate=1")}`);
-      return;
-    }
     handleGenerate();
   };
 
@@ -331,13 +354,27 @@ const CreateLogo = () => {
     await saveImagesToCollection([image]);
   };
 
-  const handleDownload = (imageToDownload?: string) => {
+  const handleDownload = async (imageToDownload?: string) => {
+    const lg = generatedLogos[selectedIndex];
     const image = imageToDownload || selectedImage;
     if (!image) return;
+    
+    let downloadUrl = image;
+    let ext = "png";
+    
+    if (lg?.engineLogo) {
+      try {
+        downloadUrl = await exportToPNG(lg.engineLogo.dataUrl, 1024);
+      } catch (e) {
+        console.error("Export PNG failed, falling back to original url");
+      }
+    }
+    
     const link = document.createElement("a");
-    link.href = image;
-    link.download = `${formData.name}-logo.png`;
+    link.href = downloadUrl;
+    link.download = `${formData.name}-logo.${ext}`.replace(/\s+/g, '-').toLowerCase();
     link.click();
+    
     if (preferences.autoSaveDownloads && user) {
       void saveImagesToCollection([image]);
     }
@@ -708,6 +745,54 @@ const CreateLogo = () => {
                         This count is fixed for premium quality consistency.
                       </p>
                     </div>
+
+                    {/* ─── Generation Mode Toggle ─── */}
+                    <div className="rounded-2xl border border-accent/20 bg-accent/5 p-4">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-primary/80">Generation Engine</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setGenerationMode("svg")}
+                          className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
+                            generationMode === "svg"
+                              ? "border-primary bg-primary/10 shadow-md"
+                              : "border-border/50 bg-secondary/20 hover:border-primary/30"
+                          }`}
+                        >
+                          <Palette className={`h-5 w-5 ${generationMode === "svg" ? "text-primary" : "text-muted-foreground"}`} />
+                          <div className="text-left">
+                            <p className={`text-sm font-bold ${generationMode === "svg" ? "text-primary" : "text-foreground"}`}>SVG Engine</p>
+                            <p className="text-[10px] text-muted-foreground">Instant • Offline • Vector</p>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!isHFConfigured()) {
+                              toast.error("Set VITE_HF_TOKEN in .env first. Get a free token at huggingface.co/settings/tokens");
+                              return;
+                            }
+                            setGenerationMode("ai");
+                          }}
+                          className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
+                            generationMode === "ai"
+                              ? "border-purple-500 bg-purple-500/10 shadow-md"
+                              : "border-border/50 bg-secondary/20 hover:border-purple-500/30"
+                          }`}
+                        >
+                          <Cpu className={`h-5 w-5 ${generationMode === "ai" ? "text-purple-400" : "text-muted-foreground"}`} />
+                          <div className="text-left">
+                            <p className={`text-sm font-bold ${generationMode === "ai" ? "text-purple-400" : "text-foreground"}`}>AI Generate</p>
+                            <p className="text-[10px] text-muted-foreground">Hugging Face • HD • Unique</p>
+                          </div>
+                        </button>
+                      </div>
+                      {generationMode === "ai" && (
+                        <p className="mt-2 text-[10px] text-purple-400/70">
+                          ⚡ AI mode uses Hugging Face SDXL. Each logo takes ~15-30s. Results are photorealistic AI art.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -736,8 +821,8 @@ const CreateLogo = () => {
                     disabled={isGenerating}
                     className="gap-2 rounded-xl glow-blue"
                   >
-                    {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    Generate {totalLogos > 1 ? `${totalLogos} Logos` : "Logo"}
+                    {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : generationMode === "ai" ? <Cpu className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                    {isGenerating && aiProgress ? aiProgress : generationMode === "ai" ? `AI Generate ${totalLogos > 1 ? `${totalLogos} Logos` : "Logo"}` : `Generate ${totalLogos > 1 ? `${totalLogos} Logos` : "Logo"}`}
                   </Button>
                 )}
               </div>
@@ -825,11 +910,17 @@ const CreateLogo = () => {
                                   <Check className="h-4 w-4 text-primary-foreground" />
                                 </div>
                               )}
-                              <img
-                                src={logo.imageUrl}
-                                alt={`${formData.name} ${styleLabel} variation ${logo.variationIndex + 1}`}
-                                className="h-full w-full rounded-xl border border-border/40 object-contain transition-transform duration-300 [transform:scale(1.08)]"
-                              />
+                              {logo.engineLogo ? (
+                                <div className="h-full w-full rounded-xl border border-border/40 transition-transform duration-300 [transform:scale(1.08)] bg-secondary/10">
+                                  <LogoSVGRenderer logo={logo.engineLogo} />
+                                </div>
+                              ) : (
+                                <img
+                                  src={logo.imageUrl}
+                                  alt={`${formData.name} ${styleLabel} variation ${logo.variationIndex + 1}`}
+                                  className="h-full w-full rounded-xl border border-border/40 object-contain transition-transform duration-300 [transform:scale(1.08)]"
+                                />
+                              )}
                             </div>
                             <div className="p-3 text-left">
                               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

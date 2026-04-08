@@ -2,14 +2,12 @@ import type { ColorPalette } from "./types";
 
 // ─── Curated Palettes ────────────────────────────────────────
 const CURATED_PALETTES: ColorPalette[] = [
-  { primary: "#111111", secondary: "#d4af37", accent: "#f5e6b3", background: "#fffdf8", text: "#1f1a14" },
-  { primary: "#0f172a", secondary: "#c0a36a", accent: "#efe3c8", background: "#f8f5ef", text: "#f8f3e8" },
-  { primary: "#1c1917", secondary: "#8c6b3f", accent: "#e8d5bb", background: "#f7f1e6", text: "#2d2118" },
-  { primary: "#2a2115", secondary: "#b58a3d", accent: "#efe0bf", background: "#fffaf0", text: "#2a2115" },
-  { primary: "#111827", secondary: "#d4b06a", accent: "#fbf1d3", background: "#f3efe6", text: "#faf6ee" },
-  { primary: "#231815", secondary: "#a67c52", accent: "#ead8c0", background: "#fbf7f1", text: "#2b221a" },
-  { primary: "#1e1b18", secondary: "#b89b62", accent: "#f3ead1", background: "#f9f6ef", text: "#302621" },
-  { primary: "#0f172a", secondary: "#8b7a5a", accent: "#e6dcc7", background: "#f7f4ee", text: "#26211d" },
+  { primary: "#00f0ff", secondary: "#8a2be2", accent: "#ff00ff", background: "#050510", text: "#ffffff" }, // Midnight Node (Cyan/Purple)
+  { primary: "#ff3366", secondary: "#ff9933", accent: "#ffcc00", background: "#050200", text: "#ffffff" }, // Solar Flare (Neon Orange/Pink)
+  { primary: "#00ff88", secondary: "#00b8ff", accent: "#00ffcc", background: "#031008", text: "#ffffff" }, // Cyber Matrix (Green/Teal)
+  { primary: "#7df9ff", secondary: "#39ff14", accent: "#ffff00", background: "#000814", text: "#ffffff" }, // Deep Web (Electric Blue/Green)
+  { primary: "#ff0055", secondary: "#7000ff", accent: "#b000ff", background: "#0a0014", text: "#ffffff" }, // Synthwave (Magenta/Deep Purple)
+  { primary: "#ffd700", secondary: "#ff8c00", accent: "#ff4500", background: "#0a0500", text: "#ffffff" }, // Gold Rush (Gold/Orange)
 ];
 
 // ─── Hex color parsing ───────────────────────────────────────
