@@ -27,7 +27,6 @@ export interface GenerateLogoResult {
   success: boolean;
   imageUrl: string;
   sourceImageUrl?: string | null;
-  provider: string;
   prompt: string;
   metadata: { businessName: string; style: LogoStyle; industry: string; generatedAt: string; warning?: string };
 }
@@ -97,7 +96,6 @@ function buildLocalFallbackResult(request: GenerateLogoRequest): GenerateLogoRes
       variant: request.variationIndex ?? 0,
     }),
     sourceImageUrl: null,
-    provider: "local/fallback",
     prompt: "Local SVG fallback generated because the remote logo service was unavailable.",
     metadata: {
       businessName: request.businessName,
@@ -122,7 +120,6 @@ export interface LogoGeneration {
   additional_instructions: string | null;
   image_url: string | null;
   prompt_used: string;
-  provider: string | null;
   status: "pending" | "completed" | "failed";
   error_message: string | null;
   generation_ms: number | null;
@@ -208,7 +205,6 @@ export async function generateLogo(
       if (dbRowId) {
         await supabase.from("logo_generations").update({
           image_url: fallbackResult.imageUrl,
-          provider: null,
           prompt_used: fallbackResult.prompt,
           status: "completed",
           error_message: null,
@@ -224,7 +220,6 @@ export async function generateLogo(
     if (dbRowId) {
       await supabase.from("logo_generations").update({
         image_url:     result.imageUrl,
-        provider:      null,
         prompt_used:   result.prompt,
         status:        "completed",
         error_message: null,
@@ -248,7 +243,6 @@ export async function generateLogo(
     if (dbRowId) {
       await supabase.from("logo_generations").update({
         image_url: fallbackResult.imageUrl,
-        provider: null,
         prompt_used: fallbackResult.prompt,
         status: "completed",
         error_message: null,

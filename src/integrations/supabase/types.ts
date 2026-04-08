@@ -82,7 +82,6 @@ export type Database = {
           industry: string
           mood: string | null
           prompt_used: string
-          provider: string | null
           status: "pending" | "processing" | "completed" | "failed"
           tagline: string | null
           updated_at: string
@@ -105,7 +104,6 @@ export type Database = {
           industry: string
           mood?: string | null
           prompt_used: string
-          provider?: string | null
           status?: "pending" | "processing" | "completed" | "failed"
           tagline?: string | null
           updated_at?: string
@@ -128,7 +126,6 @@ export type Database = {
           industry?: string
           mood?: string | null
           prompt_used?: string
-          provider?: string | null
           status?: "pending" | "processing" | "completed" | "failed"
           tagline?: string | null
           updated_at?: string
