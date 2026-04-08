@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { LogoGeneration, LOGO_STYLE_LABELS } from "@/lib/logo-client";
+import { LogoGeneration, LOGO_STYLE_LABELS, type LogoStyle } from "@/lib/logo-client";
 import { toast } from "sonner";
 
 type FolderView = "history" | "saved" | "downloads";
@@ -22,6 +22,15 @@ interface SavedLogoRow {
   image_data: string;
   created_at: string;
 }
+
+const LOGO_STYLES: LogoStyle[] = ["mascot", "minimalist", "wordmark", "lettermark", "emblem", "abstract", "vintage", "geometric", "3d", "handdrawn"];
+
+const isLogoStyle = (value: string): value is LogoStyle => LOGO_STYLES.includes(value as LogoStyle);
+
+const normalizeLogoGeneration = (row: LogoGeneration & { style?: string | null }): LogoGeneration => ({
+  ...row,
+  style: isLogoStyle(row.style ?? "") ? row.style : "minimalist",
+});
 
 const MyLogos = () => {
   const { user } = useAuth();
@@ -60,7 +69,7 @@ const MyLogos = () => {
 
       if (savedError) throw savedError;
 
-      setGenerations(historyData || []);
+      setGenerations((historyData || []).map((row) => normalizeLogoGeneration(row as LogoGeneration & { style?: string | null })));
       setSavedLogos((savedData || []) as SavedLogoRow[]);
     } catch (err: unknown) {
       console.error("[MyLogos] Fetch error:", err);
