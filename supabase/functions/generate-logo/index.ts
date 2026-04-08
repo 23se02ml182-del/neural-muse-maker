@@ -2153,7 +2153,52 @@ async function generateWithFal(prompt: string): Promise<{ dataUri: string; sourc
   return { dataUri, sourceUrl: endpoint };
 }
 
-// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+async function generateWithLovableAI(prompt: string): Promise<{ dataUri: string; sourceUrl: string }> {
+  const token = envFirst("LOVABLE_API_KEY");
+  if (!token) {
+    throw new Error("Lovable AI is not configured (missing LOVABLE_API_KEY).");
+  }
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-pro-image-preview",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      modalities: ["image", "text"],
+    }),
+    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+  });
+
+  if (response.status === 429) {
+    throw new Error("Lovable AI rate limited (429)");
+  }
+  if (response.status === 402) {
+    throw new Error("Lovable AI credits exhausted (402)");
+  }
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Lovable AI generation failed (${response.status}): ${err}`);
+  }
+
+  const data = await response.json();
+  const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (!imageUrl || typeof imageUrl !== "string") {
+    throw new Error("Lovable AI returned no image data.");
+  }
+
+  return { dataUri: imageUrl, sourceUrl: "https://ai.gateway.lovable.dev" };
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
