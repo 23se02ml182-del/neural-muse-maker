@@ -42,6 +42,7 @@ type LogoStyle =
   | "handdrawn";
 
 type ProviderKey =
+  | "lovable"
   | "openai"
   | "xai"
   | "ideogram"
@@ -130,6 +131,8 @@ interface ProviderAttempt {
 }
 
 const PROVIDER_ALIASES: Record<string, ProviderKey> = {
+  lovable: "lovable",
+  "lovable-ai": "lovable",
   openai: "openai",
   gpt: "openai",
   xai: "xai",
@@ -161,6 +164,7 @@ const PROVIDER_ALIASES: Record<string, ProviderKey> = {
 };
 
 const PROVIDER_ENV_NAMES: Record<ProviderKey, string[]> = {
+  lovable: ["LOVABLE_API_KEY"],
   openai: ["OPENAI_API_KEY"],
   xai: ["XAI_API_KEY", "X_AI_API_KEY", "GROK_API_KEY"],
   ideogram: ["IDEOGRAM_API_KEY", "IDEOGRAM_KEY"],
@@ -178,8 +182,9 @@ const PROVIDER_ENV_NAMES: Record<ProviderKey, string[]> = {
 };
 
 // Primary provider plus practical fallbacks.
-const DEFAULT_PROVIDER_ORDER: ProviderKey[] = ["huggingface", "picsart", "fireworks"];
+const DEFAULT_PROVIDER_ORDER: ProviderKey[] = ["lovable", "huggingface", "picsart", "fireworks"];
 const PREMIUM_PROVIDER_ORDER: ProviderKey[] = [
+  "lovable",
   "openai",
   "xai",
   "ideogram",
