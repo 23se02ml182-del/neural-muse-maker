@@ -179,6 +179,22 @@ const PROVIDER_ENV_NAMES: Record<ProviderKey, string[]> = {
 
 // Primary provider plus practical fallbacks.
 const DEFAULT_PROVIDER_ORDER: ProviderKey[] = ["huggingface", "picsart", "fireworks"];
+const PREMIUM_PROVIDER_ORDER: ProviderKey[] = [
+  "openai",
+  "xai",
+  "ideogram",
+  "picsart",
+  "stability",
+  "huggingface",
+  "cloudflare",
+  "fireworks",
+  "openrouter",
+  "pollinations",
+  "together",
+  "gemini",
+  "replicate",
+  "fal",
+];
 
 function uniqueProviderKeys(keys: ProviderKey[]): ProviderKey[] {
   return Array.from(new Set(keys));
@@ -196,7 +212,7 @@ function isProviderReady(provider: ProviderKey): boolean {
 }
 
 function sortProviderOrder(keys: ProviderKey[]): ProviderKey[] {
-  const rank = new Map<ProviderKey, number>(PREMIUM_PROVIDER_ORDER.map((key, index) => [key, index]));
+  const rank = new Map<ProviderKey, number>(PREMIUM_PROVIDER_ORDER.map((key: ProviderKey, index: number) => [key, index]));
   return uniqueProviderKeys(keys).sort((a, b) => (rank.get(a) ?? 999) - (rank.get(b) ?? 999));
 }
 

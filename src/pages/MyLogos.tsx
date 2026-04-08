@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { LogoGeneration, LOGO_STYLE_LABELS } from "@/lib/logo-client";
+import { LogoGeneration, LOGO_STYLE_LABELS, type LogoStyle } from "@/lib/logo-client";
 import { toast } from "sonner";
+
+const logoGenerationsTable = () => (supabase as any).from("logo_generations");
 
 type FolderView = "history" | "saved" | "downloads";
 
@@ -22,6 +24,32 @@ interface SavedLogoRow {
   image_data: string;
   created_at: string;
 }
+
+const LOGO_STYLES: LogoStyle[] = ["mascot", "minimalist", "wordmark", "lettermark", "emblem", "abstract", "vintage", "geometric", "3d", "handdrawn"];
+
+const isLogoStyle = (value: string): value is LogoStyle => LOGO_STYLES.includes(value as LogoStyle);
+
+const normalizeLogoGeneration = (row: Record<string, any>): LogoGeneration => ({
+  id: String(row.id ?? ""),
+  user_id: row.user_id ? String(row.user_id) : null,
+  business_name: String(row.business_name ?? ""),
+  tagline: row.tagline ? String(row.tagline) : null,
+  industry: String(row.industry ?? ""),
+  style: isLogoStyle(row.style ?? "") ? row.style : "minimalist",
+  colors: Array.isArray(row.colors) ? row.colors.filter((value: unknown): value is string => typeof value === "string") : null,
+  mood: row.mood ? String(row.mood) : null,
+  additional_instructions: row.additional_instructions ? String(row.additional_instructions) : null,
+  image_url: row.image_url ? String(row.image_url) : null,
+  prompt_used: String(row.prompt_used ?? ""),
+  provider: row.provider ? String(row.provider) : null,
+  status: row.status === "pending" || row.status === "failed" ? row.status : "completed",
+  error_message: row.error_message ? String(row.error_message) : null,
+  generation_ms: typeof row.generation_ms === "number" ? row.generation_ms : null,
+  user_rating: typeof row.user_rating === "number" ? row.user_rating : null,
+  was_downloaded: typeof row.was_downloaded === "boolean" ? row.was_downloaded : null,
+  created_at: String(row.created_at ?? new Date().toISOString()),
+  completed_at: row.completed_at ? String(row.completed_at) : null,
+});
 
 const MyLogos = () => {
   const { user } = useAuth();
@@ -42,8 +70,7 @@ const MyLogos = () => {
   const fetchCollections = useCallback(async () => {
     if (!user) return;
     try {
-      const { data: historyData, error: historyError } = await supabase
-        .from("logo_generations")
+      const { data: historyData, error: historyError } = await logoGenerationsTable()
         .select("*")
         .eq("user_id", user.id)
         .eq("status", "completed")
@@ -60,7 +87,7 @@ const MyLogos = () => {
 
       if (savedError) throw savedError;
 
-      setGenerations(historyData || []);
+      setGenerations((historyData || []).map((row: Record<string, any>) => normalizeLogoGeneration(row)));
       setSavedLogos((savedData || []) as SavedLogoRow[]);
     } catch (err: unknown) {
       console.error("[MyLogos] Fetch error:", err);
@@ -83,7 +110,7 @@ const MyLogos = () => {
   }, [location.search]);
 
   const deleteGeneration = async (id: string) => {
-    const { error } = await supabase.from("logo_generations").delete().eq("id", id);
+    const { error } = await logoGenerationsTable().delete().eq("id", id);
     if (error) {
       toast.error("Failed to delete record");
     } else {
@@ -109,8 +136,7 @@ const MyLogos = () => {
     link.download = `${gen.business_name.replace(/\s+/g, '-').toLowerCase()}-logo.png`;
     link.click();
 
-    await supabase
-      .from("logo_generations")
+    await logoGenerationsTable()
       .update({ was_downloaded: true })
       .eq("id", gen.id);
   };
