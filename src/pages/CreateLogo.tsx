@@ -360,7 +360,7 @@ const CreateLogo = () => {
     if (!image) return;
     
     let downloadUrl = image;
-    let ext = "png";
+    const ext = "png";
     
     if (lg?.engineLogo) {
       try {
@@ -442,7 +442,7 @@ const CreateLogo = () => {
       <main
         className={`container mx-auto ${preferences.compactMode ? "px-4 pt-24 pb-12" : "px-6 pt-28 pb-16"}`}
       >
-        {step <= totalSteps && (
+      {step <= totalSteps && (
           <>
             <div className="mx-auto mb-10 max-w-2xl">
               <div className="mb-2 flex items-center justify-between text-sm text-muted-foreground">
@@ -488,6 +488,57 @@ const CreateLogo = () => {
                   </div>
                 </div>
               )}
+
+              <div className="mt-6">
+                <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Generation Engine</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setGenerationMode("svg")}
+                      className={`flex items-center gap-4 rounded-2xl border p-5 text-left transition-all ${
+                        generationMode === "svg"
+                          ? "border-primary bg-primary/10 shadow-md"
+                          : "border-border/40 bg-background/60 hover:border-primary/40"
+                      }`}
+                    >
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Palette className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <div className="text-lg font-semibold text-foreground">SVG Engine</div>
+                        <div className="text-sm text-muted-foreground">Instant • Offline • Vector</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGenerationMode("ai")}
+                      disabled={!isHFConfigured()}
+                      className={`flex items-center gap-4 rounded-2xl border p-5 text-left transition-all ${
+                        generationMode === "ai"
+                          ? "border-primary bg-primary/10 shadow-md"
+                          : "border-border/40 bg-background/60 hover:border-primary/40"
+                      } ${!isHFConfigured() ? "cursor-not-allowed opacity-60" : ""}`}
+                    >
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Cpu className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <div className="text-lg font-semibold text-foreground">AI Generate</div>
+                        <div className="text-sm text-muted-foreground">Hugging Face • HD • Unique</div>
+                      </div>
+                    </button>
+                  </div>
+                  {!isHFConfigured() && (
+                    <p className="mt-3 text-sm text-amber-600">
+                      Hugging Face token is not configured, so AI generation is currently disabled.
+                    </p>
+                  )}
+                </div>
+              </div>
 
               {step === 2 && (
                 <div className="space-y-6">
@@ -746,53 +797,6 @@ const CreateLogo = () => {
                       </p>
                     </div>
 
-                    {/* ─── Generation Mode Toggle ─── */}
-                    <div className="rounded-2xl border border-accent/20 bg-accent/5 p-4">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-primary/80">Generation Engine</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setGenerationMode("svg")}
-                          className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
-                            generationMode === "svg"
-                              ? "border-primary bg-primary/10 shadow-md"
-                              : "border-border/50 bg-secondary/20 hover:border-primary/30"
-                          }`}
-                        >
-                          <Palette className={`h-5 w-5 ${generationMode === "svg" ? "text-primary" : "text-muted-foreground"}`} />
-                          <div className="text-left">
-                            <p className={`text-sm font-bold ${generationMode === "svg" ? "text-primary" : "text-foreground"}`}>SVG Engine</p>
-                            <p className="text-[10px] text-muted-foreground">Instant • Offline • Vector</p>
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isHFConfigured()) {
-                              toast.error("Set VITE_HF_TOKEN in .env first. Get a free token at huggingface.co/settings/tokens");
-                              return;
-                            }
-                            setGenerationMode("ai");
-                          }}
-                          className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
-                            generationMode === "ai"
-                              ? "border-purple-500 bg-purple-500/10 shadow-md"
-                              : "border-border/50 bg-secondary/20 hover:border-purple-500/30"
-                          }`}
-                        >
-                          <Cpu className={`h-5 w-5 ${generationMode === "ai" ? "text-purple-400" : "text-muted-foreground"}`} />
-                          <div className="text-left">
-                            <p className={`text-sm font-bold ${generationMode === "ai" ? "text-purple-400" : "text-foreground"}`}>AI Generate</p>
-                            <p className="text-[10px] text-muted-foreground">Hugging Face • HD • Unique</p>
-                          </div>
-                        </button>
-                      </div>
-                      {generationMode === "ai" && (
-                        <p className="mt-2 text-[10px] text-purple-400/70">
-                          ⚡ AI mode uses Hugging Face SDXL. Each logo takes ~15-30s. Results are photorealistic AI art.
-                        </p>
-                      )}
-                    </div>
                   </div>
                 </div>
               )}
@@ -818,7 +822,7 @@ const CreateLogo = () => {
                 ) : (
                   <Button
                     onClick={handleGenerateClick}
-                    disabled={isGenerating}
+                    disabled={isGenerating || (generationMode === "ai" && !isHFConfigured())}
                     className="gap-2 rounded-xl glow-blue"
                   >
                     {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : generationMode === "ai" ? <Cpu className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}

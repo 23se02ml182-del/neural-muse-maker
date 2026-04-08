@@ -170,7 +170,8 @@ function renderSVG(config: LogoConfig): string {
 </svg>`;
       break;
 
-    case "brandcrowd-modern":
+    case "brandcrowd-modern": {
+      const badgeText = (tagline || "SINCE 2026").toUpperCase();
       svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   ${defs}
   <rect width="${width}" height="${height}" fill="${palette.background}"/>
@@ -178,9 +179,10 @@ function renderSVG(config: LogoConfig): string {
     ${iconPaths}
   </g>
   <text x="${layout.textX}" y="${layout.textY}" text-anchor="middle" font-family='${fontFamily}' font-weight="900" font-size="${layout.textSize}" letter-spacing="${font.letterSpacing + 2}" fill="url(#primary-grad)" filter="url(#text-shadow)">${name.toUpperCase()}</text>
-  ${tagline || "SINCE 2026" ? `<text x="${layout.textX}" y="${layout.taglineY}" text-anchor="middle" font-family='${fontFamily}' font-weight="500" font-size="${layout.taglineSize}" letter-spacing="14" fill="${palette.secondary}" opacity="0.65" text-transform="uppercase">${((tagline || "SINCE 2026").toUpperCase())}</text>` : ""}
+  <text x="${layout.textX}" y="${layout.taglineY}" text-anchor="middle" font-family='${fontFamily}' font-weight="500" font-size="${layout.taglineSize}" letter-spacing="14" fill="${palette.secondary}" opacity="0.65" text-transform="uppercase">${badgeText}</text>
 </svg>`;
       break;
+    }
 
     case "icon-only":
     default:
