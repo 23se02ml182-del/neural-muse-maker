@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildLocalLogoFallback, extractGeneratedImage } from "@/lib/logo-generation";
 
+const logoGenerationsTable = () => (supabase as any).from("logo_generations");
+
 // ─── TYPES ───────────────────────────────────────────────────
 export type LogoStyle =
   | "mascot" | "minimalist" | "wordmark" | "lettermark"
@@ -151,7 +153,7 @@ export async function generateLogo(
   let dbRowId: string | undefined;
   if (userId) {
     try {
-      const { data: row } = await supabase.from("logo_generations").insert({
+      const { data: row } = await logoGenerationsTable().insert({
         user_id: userId,
         business_name: request.businessName,
         tagline: request.tagline ?? null,
@@ -206,7 +208,7 @@ export async function generateLogo(
       const fallbackResult = buildLocalFallbackResult(request);
       onStatus?.("done", "Remote generator unavailable, using a local fallback logo.");
       if (dbRowId) {
-        await supabase.from("logo_generations").update({
+        await logoGenerationsTable().update({
           image_url: fallbackResult.imageUrl,
           provider: null,
           prompt_used: fallbackResult.prompt,
@@ -222,7 +224,7 @@ export async function generateLogo(
     onStatus?.("done", "Logo generated successfully!");
 
     if (dbRowId) {
-      await supabase.from("logo_generations").update({
+      await logoGenerationsTable().update({
         image_url:     result.imageUrl,
         provider:      null,
         prompt_used:   result.prompt,
@@ -239,14 +241,14 @@ export async function generateLogo(
     const message = err instanceof Error ? err.message : String(err);
     onStatus?.("error", `Generation failed: ${message}`);
     if (dbRowId) {
-      await supabase.from("logo_generations")
+      await logoGenerationsTable()
         .update({ status: "failed", error_message: message })
         .eq("id", dbRowId);
     }
     const fallbackResult = buildLocalFallbackResult(request);
     onStatus?.("done", "Remote generation failed, using a local fallback logo.");
     if (dbRowId) {
-      await supabase.from("logo_generations").update({
+      await logoGenerationsTable().update({
         image_url: fallbackResult.imageUrl,
         provider: null,
         prompt_used: fallbackResult.prompt,
@@ -262,13 +264,13 @@ export async function generateLogo(
 
 // ─── HELPERS ─────────────────────────────────────────────────
 export const rateLogoGeneration = (id: string, rating: 1|2|3|4|5) =>
-  supabase.from("logo_generations").update({ user_rating: rating }).eq("id", id);
+  logoGenerationsTable().update({ user_rating: rating }).eq("id", id);
 
 export const markLogoDownloaded = (id: string) =>
-  supabase.from("logo_generations").update({ was_downloaded: true }).eq("id", id);
+  logoGenerationsTable().update({ was_downloaded: true }).eq("id", id);
 
 export const getLogoHistory = (limit = 20) =>
-  supabase.from("logo_generations").select("*")
+  logoGenerationsTable().select("*")
     .eq("status", "completed").order("created_at", { ascending: false }).limit(limit);
 
 // ─── UI HELPERS ───────────────────────────────────────────────
