@@ -42,6 +42,7 @@ type LogoStyle =
   | "handdrawn";
 
 type ProviderKey =
+  | "lovable"
   | "openai"
   | "xai"
   | "ideogram"
@@ -130,6 +131,8 @@ interface ProviderAttempt {
 }
 
 const PROVIDER_ALIASES: Record<string, ProviderKey> = {
+  lovable: "lovable",
+  "lovable-ai": "lovable",
   openai: "openai",
   gpt: "openai",
   xai: "xai",
@@ -161,6 +164,7 @@ const PROVIDER_ALIASES: Record<string, ProviderKey> = {
 };
 
 const PROVIDER_ENV_NAMES: Record<ProviderKey, string[]> = {
+  lovable: ["LOVABLE_API_KEY"],
   openai: ["OPENAI_API_KEY"],
   xai: ["XAI_API_KEY", "X_AI_API_KEY", "GROK_API_KEY"],
   ideogram: ["IDEOGRAM_API_KEY", "IDEOGRAM_KEY"],
@@ -178,8 +182,9 @@ const PROVIDER_ENV_NAMES: Record<ProviderKey, string[]> = {
 };
 
 // Primary provider plus practical fallbacks.
-const DEFAULT_PROVIDER_ORDER: ProviderKey[] = ["huggingface", "picsart", "fireworks"];
+const DEFAULT_PROVIDER_ORDER: ProviderKey[] = ["lovable", "huggingface", "picsart", "fireworks"];
 const PREMIUM_PROVIDER_ORDER: ProviderKey[] = [
+  "lovable",
   "openai",
   "xai",
   "ideogram",
@@ -2148,7 +2153,52 @@ async function generateWithFal(prompt: string): Promise<{ dataUri: string; sourc
   return { dataUri, sourceUrl: endpoint };
 }
 
-// ─── MAIN HANDLER ────────────────────────────────────────────────────────────
+async function generateWithLovableAI(prompt: string): Promise<{ dataUri: string; sourceUrl: string }> {
+  const token = envFirst("LOVABLE_API_KEY");
+  if (!token) {
+    throw new Error("Lovable AI is not configured (missing LOVABLE_API_KEY).");
+  }
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-pro-image-preview",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      modalities: ["image", "text"],
+    }),
+    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+  });
+
+  if (response.status === 429) {
+    throw new Error("Lovable AI rate limited (429)");
+  }
+  if (response.status === 402) {
+    throw new Error("Lovable AI credits exhausted (402)");
+  }
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Lovable AI generation failed (${response.status}): ${err}`);
+  }
+
+  const data = await response.json();
+  const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (!imageUrl || typeof imageUrl !== "string") {
+    throw new Error("Lovable AI returned no image data.");
+  }
+
+  return { dataUri: imageUrl, sourceUrl: "https://ai.gateway.lovable.dev" };
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
@@ -2190,6 +2240,12 @@ serve(async (req) => {
     const providerErrors: string[] = [];
 
     const allProviders: ProviderAttempt[] = [
+      {
+        key: "lovable",
+        name: "lovable/gemini-image+composed",
+        run: () => generateWithLovableAI(generationPrompt),
+        maxAttempts: 2,
+      },
       {
         key: "openai",
         name: "openai/gpt-image-1+composed",

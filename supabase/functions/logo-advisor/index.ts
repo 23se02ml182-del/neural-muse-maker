@@ -15,9 +15,6 @@ const sseHeaders = {
   Connection: "keep-alive",
 };
 
-// Default to resilient mode so the advisor still works without external credits.
-// Set AI_ADVISOR_FREE_ONLY=false only if you explicitly want paid model calls.
-const FREE_ONLY_MODE = (Deno.env.get("AI_ADVISOR_FREE_ONLY") ?? "true").trim().toLowerCase() !== "false";
 
 function streamedAssistantMessage(message: string, code?: "402" | "429") {
   const payload = `data: ${JSON.stringify({ choices: [{ delta: { content: message } }] })}\n\ndata: [DONE]\n\n`;
@@ -405,165 +402,6 @@ function localAdvisorReply(
     : "Ask one specific branding question and I’ll answer it directly.";
 }
 
-function extractCloudflareText(payload: unknown): string | null {
-  if (!payload) return null;
-  if (typeof payload === "string") {
-    const text = payload.trim();
-    return text || null;
-  }
-  if (Array.isArray(payload)) {
-    for (const item of payload) {
-      const found = extractCloudflareText(item);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (typeof payload === "object") {
-    const obj = payload as Record<string, unknown>;
-    const preferredKeys = ["response", "text", "output_text", "result", "content", "answer"];
-    for (const key of preferredKeys) {
-      if (key in obj) {
-        const found = extractCloudflareText(obj[key]);
-        if (found) return found;
-      }
-    }
-  }
-  return null;
-}
-
-async function callCloudflareAdvisor(messages: Array<{ role: string; content: string }>, systemPrompt: string) {
-  const token = Deno.env.get("CLOUDFLARE_API_TOKEN") || Deno.env.get("CF_API_TOKEN");
-  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") || Deno.env.get("CF_ACCOUNT_ID");
-  const model = Deno.env.get("CLOUDFLARE_TEXT_MODEL") || "@cf/meta/llama-3.1-8b-instruct";
-
-  if (!token || !accountId) return null;
-
-  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messages: [{ role: "system", content: systemPrompt }, ...messages.slice(-10)],
-      temperature: 0.2,
-      max_tokens: 700,
-    }),
-  });
-
-  if (!response.ok) {
-    console.error("Cloudflare advisor error:", response.status, await response.text());
-    return null;
-  }
-
-  const data = await response.json();
-  const content = extractCloudflareText(data?.result ?? data);
-  if (!content) return null;
-  return streamedAssistantMessage(content);
-}
-
-async function callOpenAIDirect(messages: Array<{role: string; content: string}>, systemPrompt: string) {
-  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-  if (!OPENAI_API_KEY) return null;
-
-  const model = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "system", content: systemPrompt }, ...messages],
-      temperature: 0.1,
-      max_tokens: 600,
-      stream: false,
-    }),
-  });
-
-  if (!response.ok) {
-    console.error("OpenAI direct API error:", response.status, await response.text());
-    return null;
-  }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content?.trim();
-  if (!content) return null;
-  return streamedAssistantMessage(content);
-}
-
-async function callGeminiDirect(messages: Array<{role: string; content: string}>, systemPrompt: string) {
-  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-  if (!GEMINI_API_KEY) return null;
-
-  const geminiMessages = messages.map((m: {role: string; content: string}) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: geminiMessages,
-        generationConfig: { temperature: 0.1 },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    console.error("Gemini direct API error:", response.status, await response.text());
-    return null;
-  }
-
-  // Transform Google's SSE format to OpenAI-compatible SSE
-  const reader = response.body!.getReader();
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      let buffer = "";
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const jsonStr = line.slice(6).trim();
-            if (!jsonStr || jsonStr === "[DONE]") continue;
-
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
-              if (text) {
-                const sseChunk = `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`;
-                controller.enqueue(encoder.encode(sseChunk));
-              }
-            } catch { /* skip malformed */ }
-          }
-        }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
-      } catch (e: any) {
-        console.error("Stream transform error:", e);
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(stream, { headers: sseHeaders });
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -609,57 +447,42 @@ Available options for reference (Recommend these styles):
 - Industries: Technology, Food & Beverage, Health & Fitness, Fashion, Education, Finance, Entertainment, Travel, Real Estate, Music, Sports, Photography, Automotive, Gaming, Architecture, Legal, Agriculture, Beauty & Cosmetics, Logistics, Non-Profit
 - Icon Ideas: Abstract shapes, Letter-based, Mascot character, Nature element, Animal, Shield/Badge, Circuit/Tech, Crown/Luxury, Globe/World, Lightning bolt, Leaf/Eco, Compass/Direction`;
 
-    if (FREE_ONLY_MODE) {
-      const cfReply = await callCloudflareAdvisor(focusedMessages, systemPrompt);
-      if (cfReply) return cfReply;
-      return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode));
-    }
-
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    // Try Lovable gateway first
     if (LOVABLE_API_KEY) {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.0-flash",
-          messages: [{ role: "system", content: systemPrompt }, ...focusedMessages],
-          stream: true,
-          temperature: 0.1,
-        }),
-      });
+      try {
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [{ role: "system", content: systemPrompt }, ...focusedMessages],
+            stream: true,
+            temperature: 0.1,
+          }),
+        });
 
-      if (response.status === 429) {
-        const fallback = await callCloudflareAdvisor(focusedMessages, systemPrompt);
-        if (fallback) return fallback;
-        return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode), "429");
+        if (response.status === 429) {
+          console.warn("Lovable AI rate limited (429), falling back to local advisor.");
+          return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode), "429");
+        }
+        if (response.status === 402) {
+          console.warn("Lovable AI credits exhausted (402), falling back to local advisor.");
+          return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode), "402");
+        }
+        if (response.ok) {
+          return new Response(response.body, { headers: sseHeaders });
+        }
+        console.error("Lovable AI gateway error:", response.status);
+      } catch (e: any) {
+        console.error("Lovable AI gateway fetch error:", e?.message || e);
       }
-      if (response.status === 402) {
-        console.log("Lovable credits exhausted; falling back to Cloudflare or local advisor.");
-        const fallback = await callCloudflareAdvisor(focusedMessages, systemPrompt);
-        if (fallback) return fallback;
-        return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode), "402");
-      }
-    if (response.ok) {
-      return new Response(response.body, { headers: sseHeaders });
     }
 
-      // Non-402/429 error — try Cloudflare fallback first.
-      console.error("Lovable gateway error:", response.status);
-    }
-
-    // No LOVABLE_API_KEY or gateway failed — try Cloudflare Workers AI first.
-    const fallback = await callCloudflareAdvisor(focusedMessages, systemPrompt);
-    if (fallback) return fallback;
-
-    // Optional direct OpenAI fallback if configured.
-    const openAIFallback = await callOpenAIDirect(focusedMessages, systemPrompt);
-    if (openAIFallback) return openAIFallback;
-
+    // Fallback: local advisor (no external API calls needed)
     return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode));
   } catch (e: any) {
     console.error("logo-advisor error:", e);
