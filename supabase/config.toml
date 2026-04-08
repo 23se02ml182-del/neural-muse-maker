@@ -1,0 +1,7 @@
+project_id = "fcrqihrwnllbkxujucjt"
+
+[functions.generate-logo]
+verify_jwt = false
+
+[functions.logo-advisor]
+verify_jwt = false
