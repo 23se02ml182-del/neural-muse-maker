@@ -609,57 +609,42 @@ Available options for reference (Recommend these styles):
 - Industries: Technology, Food & Beverage, Health & Fitness, Fashion, Education, Finance, Entertainment, Travel, Real Estate, Music, Sports, Photography, Automotive, Gaming, Architecture, Legal, Agriculture, Beauty & Cosmetics, Logistics, Non-Profit
 - Icon Ideas: Abstract shapes, Letter-based, Mascot character, Nature element, Animal, Shield/Badge, Circuit/Tech, Crown/Luxury, Globe/World, Lightning bolt, Leaf/Eco, Compass/Direction`;
 
-    if (FREE_ONLY_MODE) {
-      const cfReply = await callCloudflareAdvisor(focusedMessages, systemPrompt);
-      if (cfReply) return cfReply;
-      return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode));
-    }
-
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    // Try Lovable gateway first
     if (LOVABLE_API_KEY) {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.0-flash",
-          messages: [{ role: "system", content: systemPrompt }, ...focusedMessages],
-          stream: true,
-          temperature: 0.1,
-        }),
-      });
+      try {
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [{ role: "system", content: systemPrompt }, ...focusedMessages],
+            stream: true,
+            temperature: 0.1,
+          }),
+        });
 
-      if (response.status === 429) {
-        const fallback = await callCloudflareAdvisor(focusedMessages, systemPrompt);
-        if (fallback) return fallback;
-        return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode), "429");
+        if (response.status === 429) {
+          console.warn("Lovable AI rate limited (429), falling back to local advisor.");
+          return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode), "429");
+        }
+        if (response.status === 402) {
+          console.warn("Lovable AI credits exhausted (402), falling back to local advisor.");
+          return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode), "402");
+        }
+        if (response.ok) {
+          return new Response(response.body, { headers: sseHeaders });
+        }
+        console.error("Lovable AI gateway error:", response.status);
+      } catch (e: any) {
+        console.error("Lovable AI gateway fetch error:", e?.message || e);
       }
-      if (response.status === 402) {
-        console.log("Lovable credits exhausted; falling back to Cloudflare or local advisor.");
-        const fallback = await callCloudflareAdvisor(focusedMessages, systemPrompt);
-        if (fallback) return fallback;
-        return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode), "402");
-      }
-    if (response.ok) {
-      return new Response(response.body, { headers: sseHeaders });
     }
 
-      // Non-402/429 error — try Cloudflare fallback first.
-      console.error("Lovable gateway error:", response.status);
-    }
-
-    // No LOVABLE_API_KEY or gateway failed — try Cloudflare Workers AI first.
-    const fallback = await callCloudflareAdvisor(focusedMessages, systemPrompt);
-    if (fallback) return fallback;
-
-    // Optional direct OpenAI fallback if configured.
-    const openAIFallback = await callOpenAIDirect(focusedMessages, systemPrompt);
-    if (openAIFallback) return openAIFallback;
-
+    // Fallback: local advisor (no external API calls needed)
     return streamedAssistantMessage(localAdvisorReply(focusedMessages ?? [], formData ?? {}, safeAdvisorMode));
   } catch (e: any) {
     console.error("logo-advisor error:", e);
