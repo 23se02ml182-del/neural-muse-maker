@@ -2241,6 +2241,12 @@ serve(async (req) => {
 
     const allProviders: ProviderAttempt[] = [
       {
+        key: "lovable",
+        name: "lovable/gemini-image+composed",
+        run: () => generateWithLovableAI(generationPrompt),
+        maxAttempts: 2,
+      },
+      {
         key: "openai",
         name: "openai/gpt-image-1+composed",
         run: () => generateWithOpenAI(generationPrompt),
